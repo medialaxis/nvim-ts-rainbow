@@ -29,6 +29,8 @@ local termcolors = configs.get_module("rainbow").termcolors
 --- parser from getting garbage-collected.
 local buffer_parsers = {}
 
+local dirty_buffers = {}
+
 --- Find the nesting level of a node.
 --- @param node table # Node to find the level of
 --- @param len number # Number of colours
@@ -169,6 +171,18 @@ end
 
 M.defhl()
 
+--- Refresh all dirty buffers
+function M.refresh()
+    for bufnr, dirty in pairs(dirty_buffers) do
+        if dirty then
+            vim.api.nvim_buf_clear_namespace(bufnr, nsid, 0, -1)
+            full_update(bufnr)
+        end
+    end
+
+    dirty_buffers = {}
+end
+
 --- Attach module to buffer. Called when new buffer is opened or `:TSBufEnable rainbow`.
 --- @param bufnr number # Buffer number
 --- @param lang string # Buffer language
@@ -182,11 +196,7 @@ function M.attach(bufnr, lang)
     local parser = parsers.get_parser(bufnr, lang)
     parser:register_cbs({
         on_changedtree = function(changes, tree)
-            if state_table[bufnr] then
-                update_range(bufnr, changes, tree, lang)
-            else
-                return
-            end
+            dirty_buffers[bufnr] = true
         end,
     })
     buffer_parsers[bufnr] = parser
